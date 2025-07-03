@@ -5,6 +5,7 @@ import Customers from './pages/Customers';
 import Dashboard from './pages/Dashboard';
 import Subscriptions from './pages/Subscriptions';
 import Payments from './pages/Payments';
+import CustomerDetail from './pages/CustomerDetail';
 import { supabase } from './service/supabaseClient';
 import { Box, CircularProgress } from '@mui/material';
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/customers" element={<PrivateRoute><Customers /></PrivateRoute>} />
+        <Route path="/customer/:id" element={<PrivateRoute><CustomerDetail /></PrivateRoute>} />
         <Route path="/subscriptions" element={<PrivateRoute><Subscriptions /></PrivateRoute>} />
         <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
