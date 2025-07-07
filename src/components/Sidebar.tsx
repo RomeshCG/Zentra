@@ -1,77 +1,41 @@
 import React from 'react';
-import { Drawer, List, ListItemButton, ListItemIcon, ListItemText, Box, Toolbar, Divider, Button } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import SubscriptionsIcon from '@mui/icons-material/Subscriptions';
-import PaymentIcon from '@mui/icons-material/Payment';
-import LogoutIcon from '@mui/icons-material/Logout';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../service/supabaseClient';
-
-const drawerWidth = 220;
-
-const navItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
-  { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
-  { text: 'Payments', icon: <PaymentIcon />, path: '/payments' },
-];
+import { NavLink } from 'react-router-dom';
 
 const Sidebar: React.FC = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', bgcolor: '#181c24', color: '#fff' },
-      }}
-    >
-      <Toolbar sx={{ minHeight: 64 }}>
-        <Box fontWeight="bold" fontSize={22} letterSpacing={1} ml={1}>
-          Zentra
-        </Box>
-      </Toolbar>
-      <Divider sx={{ bgcolor: '#232a36' }} />
-      <List>
-        {navItems.map((item) => (
-          <ListItemButton
-            key={item.text}
-            selected={location.pathname === item.path}
-            onClick={() => navigate(item.path)}
-            sx={{
-              color: location.pathname === item.path ? '#90caf9' : '#fff',
-              '&.Mui-selected': { bgcolor: '#232a36' },
-              '&:hover': { bgcolor: '#232a36' },
-            }}
-          >
-            <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItemButton>
-        ))}
-      </List>
-      <Box flexGrow={1} />
-      <Box p={2}>
-        <Button
-          variant="outlined"
-          color="inherit"
-          startIcon={<LogoutIcon />}
-          fullWidth
-          onClick={handleLogout}
-          sx={{ borderColor: '#90caf9', color: '#90caf9', '&:hover': { borderColor: '#fff', color: '#fff' } }}
-        >
-          Logout
-        </Button>
-      </Box>
-    </Drawer>
+    <nav className="h-screen w-56 bg-slate-900 text-white flex flex-col py-6 px-3 fixed top-0 left-0 z-10">
+      <div className="mb-8 text-2xl font-bold tracking-wide text-center text-cyan-400">Zentra</div>
+      <div className="flex-1 flex flex-col gap-6">
+        <div>
+          <div className="text-xs uppercase text-slate-400 mb-2 pl-2">Main</div>
+          <ul className="space-y-1">
+            <li><NavLink to="/dashboard" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Dashboard</NavLink></li>
+          </ul>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-slate-400 mb-2 pl-2">Management</div>
+          <ul className="space-y-1">
+            <li><NavLink to="/customers" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Customers</NavLink></li>
+            <li><NavLink to="/plan-managers" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Plan Managers</NavLink></li>
+            <li><NavLink to="/subscriptions" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Subscriptions</NavLink></li>
+          </ul>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-slate-400 mb-2 pl-2">Finance</div>
+          <ul className="space-y-1">
+            <li><NavLink to="/payments" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Payments</NavLink></li>
+            <li><NavLink to="/bank-accounts" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Bank Accounts</NavLink></li>
+            <li><NavLink to="/profit-expenses" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Profit & Expenses</NavLink></li>
+          </ul>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-slate-400 mb-2 pl-2">Settings</div>
+          <ul className="space-y-1">
+            <li><NavLink to="/settings" className={({ isActive }) => isActive ? "block rounded bg-cyan-700 px-4 py-2 font-semibold" : "block rounded hover:bg-slate-800 px-4 py-2"}>Settings</NavLink></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
   );
 };
 
