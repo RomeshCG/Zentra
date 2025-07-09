@@ -28,7 +28,6 @@ const PlanManagerDetail: React.FC = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [customerMonths, setCustomerMonths] = useState<{ [customerId: string]: any[] }>({});
   const [monthsLoading, setMonthsLoading] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [manualRenewalOverride, setManualRenewalOverride] = useState(false);
   const [manualProfitOverride, setManualProfitOverride] = useState(false);
@@ -85,9 +84,6 @@ const PlanManagerDetail: React.FC = () => {
     };
     if (id) fetchData();
   }, [id]);
-
-  // Helper to get default expense
-  const getDefaultExpense = () => manager ? (Number(manager.monthly_cost) / 5).toFixed(2) : '';
 
   // Handle add/edit customer form changes with auto-calc
   const handleCustomerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -237,35 +233,51 @@ const PlanManagerDetail: React.FC = () => {
       platform: manager.platform,
       manager_plan_id: manager.id,
     };
-    let error, insertedCustomer;
     if (editingCustomerId) {
       // Update
-      ({ error } = await supabase.from('customers').update(customerData).eq('id', editingCustomerId));
-      insertedCustomer = { ...customerData, id: editingCustomerId };
+      const { error } = await supabase.from('customers').update(customerData).eq('id', editingCustomerId);
+      if (error) {
+        setCustomerError(error.message);
+        setCustomerLoading(false);
+        return;
+      }
+      setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '' });
+      setEditingCustomerId(null);
+      // Refresh customers
+      const { data: customerDataNew } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('manager_plan_id', id)
+        .order('created_at', { ascending: false });
+      setCustomers(customerDataNew || []);
+      // Create per-month records if new customer
+      if (!editingCustomerId && customerDataNew) {
+        await createCustomerMonths(customerDataNew.find(c => c.id === editingCustomerId), manager);
+        await fetchCustomerMonths(editingCustomerId);
+      }
     } else {
       // Insert
       const { data, error: insertError } = await supabase.from('customers').insert([customerData]).select();
-      error = insertError;
-      insertedCustomer = data && data[0];
-    }
-    if (error) {
-      setCustomerError(error.message);
-      setCustomerLoading(false);
-      return;
-    }
-    setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '' });
-    setEditingCustomerId(null);
-    // Refresh customers
-    const { data: customerDataNew } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('manager_plan_id', id)
-      .order('created_at', { ascending: false });
-    setCustomers(customerDataNew || []);
-    // Create per-month records if new customer
-    if (!editingCustomerId && insertedCustomer) {
-      await createCustomerMonths(insertedCustomer, manager);
-      await fetchCustomerMonths(insertedCustomer.id);
+      if (insertError) {
+        setCustomerError(insertError.message);
+        setCustomerLoading(false);
+        return;
+      }
+      const insertedCustomer = data && data[0];
+      setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '' });
+      setEditingCustomerId(null);
+      // Refresh customers
+      const { data: customerDataNew } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('manager_plan_id', id)
+        .order('created_at', { ascending: false });
+      setCustomers(customerDataNew || []);
+      // Create per-month records if new customer
+      if (insertedCustomer) {
+        await createCustomerMonths(insertedCustomer, manager);
+        await fetchCustomerMonths(insertedCustomer.id);
+      }
     }
     setCustomerLoading(false);
     setShowAddModal(false);
@@ -284,12 +296,6 @@ const PlanManagerDetail: React.FC = () => {
       profit: customer.profit?.toString() || '',
       notes: customer.notes || '',
     });
-  };
-
-  // Cancel edit
-  const handleCancelEdit = () => {
-    setEditingCustomerId(null);
-    setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '' });
   };
 
   // Delete customer
@@ -729,39 +735,6 @@ const PlanManagerDetail: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
-      )}
-      {selectedCustomerId && (
-        <div className="bg-slate-50 rounded-xl shadow p-4 mt-6">
-          <h3 className="text-base font-semibold mb-2">Per-Month Breakdown</h3>
-          {monthsLoading ? (
-            <div>Loading...</div>
-          ) : (
-            <table className="min-w-full border text-xs">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="px-2 py-1">Month</th>
-                  <th className="px-2 py-1">Income</th>
-                  <th className="px-2 py-1">Expense</th>
-                  <th className="px-2 py-1">Profit</th>
-                  <th className="px-2 py-1">Price Used</th>
-                  <th className="px-2 py-1">Trial?</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(customerMonths[selectedCustomerId] || []).map((m, idx) => (
-                  <tr key={idx} className="border-t">
-                    <td className="px-2 py-1">{m.month}</td>
-                    <td className="px-2 py-1">Rs.{Number(m.income).toFixed(2)}</td>
-                    <td className="px-2 py-1">Rs.{Number(m.expense).toFixed(2)}</td>
-                    <td className="px-2 py-1">Rs.{Number(m.profit).toFixed(2)}</td>
-                    <td className="px-2 py-1">Rs.{Number(m.price_used).toFixed(2)}</td>
-                    <td className="px-2 py-1">{m.is_trial ? 'Yes' : ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
         </div>
       )}
     </div>

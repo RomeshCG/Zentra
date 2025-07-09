@@ -38,11 +38,6 @@ const Dashboard: React.FC = () => {
     fetchRenewals();
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center">
       <div className="bg-white rounded-xl p-8 w-[90vw] max-w-[1400px] mx-auto mt-8">
