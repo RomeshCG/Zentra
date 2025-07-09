@@ -1,5 +1,5 @@
 import React, { useEffect, useState, type ReactNode } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
@@ -12,6 +12,7 @@ import Settings from './pages/Settings';
 import Sidebar from './components/Sidebar';
 import { supabase } from './service/supabaseClient';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import PlanManagerDetail from './pages/PlanManagerDetail';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -38,12 +39,19 @@ function PrivateRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-const AppLayout: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div style={{ display: 'flex' }}>
-    <Sidebar />
-    <main style={{ marginLeft: 220, flex: 1, padding: '32px' }}>{children}</main>
-  </div>
-);
+const AppLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+  return (
+    <div style={{ display: 'flex' }}>
+      <Sidebar onLogout={handleLogout} />
+      <main style={{ marginLeft: 220, flex: 1, padding: '32px' }}>{children}</main>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   return (
@@ -86,6 +94,16 @@ const App: React.FC = () => {
             <PrivateRoute>
               <AppLayout>
                 <PlanManagers />
+              </AppLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/plan-managers/:id"
+          element={
+            <PrivateRoute>
+              <AppLayout>
+                <PlanManagerDetail />
               </AppLayout>
             </PrivateRoute>
           }

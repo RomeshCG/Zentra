@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   return (
     <nav className="h-screen w-56 bg-slate-900 text-white flex flex-col py-6 px-3 fixed top-0 left-0 z-10">
       <div className="mb-8 text-2xl font-bold tracking-wide text-center text-cyan-400">Zentra</div>
@@ -35,6 +35,12 @@ const Sidebar: React.FC = () => {
           </ul>
         </div>
       </div>
+      <button
+        onClick={onLogout}
+        className="mt-8 w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-lg shadow"
+      >
+        Logout
+      </button>
     </nav>
   );
 };
