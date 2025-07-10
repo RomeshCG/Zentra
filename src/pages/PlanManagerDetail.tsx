@@ -350,6 +350,7 @@ const PlanManagerDetail: React.FC = () => {
       renewal_period: editForm.renewal_period,
       is_active: editForm.is_active,
       notes: editForm.notes,
+      address: editForm.address,
     };
     const { error } = await supabase.from('plan_managers').update(updateData).eq('id', manager.id);
     if (error) {
@@ -512,6 +513,9 @@ const PlanManagerDetail: React.FC = () => {
           </div>
           <div><span className="font-medium">Active:</span> {manager.is_active ? 'Yes' : 'No'}</div>
         </div>
+        {manager.address && (
+          <div className="text-sm text-slate-700 mb-1"><span className="font-medium">Address:</span> {manager.address}</div>
+        )}
         {manager.notes && <div className="text-xs text-slate-500 mt-1">{manager.notes}</div>}
         {renewError && <div className="text-red-600 text-xs mb-2">{renewError}</div>}
       </div>
@@ -717,6 +721,10 @@ const PlanManagerDetail: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">Renewal Period</label>
                   <input name="renewal_period" value={editForm.renewal_period || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Address</label>
+                  <input name="address" value={editForm.address || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
                 </div>
               </div>
               <div>
