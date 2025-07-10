@@ -522,7 +522,29 @@ const PlanManagerDetail: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Customers</h2>
         {remainingSlots > 0 ? (
-          <button onClick={() => setShowAddModal(true)} className="bg-cyan-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-cyan-800 shadow">Add Customer</button>
+          <button
+            onClick={() => {
+              if (manager && manager.platform) {
+                let defaults = { name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' };
+                if (manager.platform.toLowerCase() === 'youtube' || manager.platform.toLowerCase() === 'yt') {
+                  defaults.income = '500';
+                  defaults.expense = '344';
+                  defaults.profit = (500 - 344).toString();
+                } else if (manager.platform.toLowerCase() === 'spotify') {
+                  defaults.income = '400';
+                  defaults.expense = '254';
+                  defaults.profit = (400 - 254).toString();
+                }
+                setCustomerForm(defaults);
+              } else {
+                setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' });
+              }
+              setShowAddModal(true);
+            }}
+            className="bg-cyan-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-cyan-800 shadow"
+          >
+            Add Customer
+          </button>
         ) : (
           <span className="text-red-600 font-semibold">All slots are filled for this plan manager.</span>
         )}
