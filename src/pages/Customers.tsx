@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../service/supabaseClient';
+import * as XLSX from 'xlsx';
 
 const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -151,6 +152,30 @@ const Customers: React.FC = () => {
           onChange={e => { setRenewalDate(e.target.value); setShowThisWeek(false); }}
           className="border rounded px-3 py-2"
         />
+        <button
+          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 shadow"
+          onClick={() => {
+            const exportData = filtered.map(c => ({
+              Name: c.name,
+              Email: c.email,
+              Phone: c.phone,
+              'Plan Manager': managerMap[c.manager_plan_id]?.display_name || managerMap[c.manager_plan_id]?.platform || '-',
+              Platform: managerMap[c.manager_plan_id]?.platform || '-',
+              'Renewal Date': c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-',
+              Income: c.income,
+              Expense: c.expense,
+              Profit: c.profit,
+              Notes: c.notes,
+              Flagged: c.is_flagged ? 'Yes' : 'No',
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+            XLSX.writeFile(wb, `customers_export.xlsx`);
+          }}
+        >
+          Export to Excel
+        </button>
       </div>
       {/* Table wrapper with horizontal scroll always visible */}
       <div className="w-full rounded-xl shadow-md bg-white overflow-x-scroll">

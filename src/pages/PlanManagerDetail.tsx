@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../service/supabaseClient';
+import * as XLSX from 'xlsx';
 
 const PlanManagerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -521,33 +522,65 @@ const PlanManagerDetail: React.FC = () => {
       </div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Customers</h2>
-        {remainingSlots > 0 ? (
+        <div className="flex gap-2 items-center">
+          {remainingSlots > 0 ? (
+            <button
+              onClick={() => {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${yyyy}-${mm}-${dd}`;
+                if (manager && manager.platform) {
+                  let defaults = { name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' };
+                  if (manager.platform.toLowerCase() === 'youtube' || manager.platform.toLowerCase() === 'yt') {
+                    defaults.income = '500';
+                    defaults.expense = '344';
+                    defaults.profit = (500 - 344).toString();
+                  } else if (manager.platform.toLowerCase() === 'spotify') {
+                    defaults.income = '400';
+                    defaults.expense = '254';
+                    defaults.profit = (400 - 254).toString();
+                  }
+                  setCustomerForm(defaults);
+                } else {
+                  setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' });
+                }
+                setStartDate(todayStr);
+                setNumMonths(1);
+                setManualRenewalOverride(false);
+                setShowAddModal(true);
+              }}
+              className="bg-cyan-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-cyan-800 shadow"
+            >
+              Add Customer
+            </button>
+          ) : (
+            <span className="text-red-600 font-semibold">All slots are filled for this plan manager.</span>
+          )}
           <button
             onClick={() => {
-              if (manager && manager.platform) {
-                let defaults = { name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' };
-                if (manager.platform.toLowerCase() === 'youtube' || manager.platform.toLowerCase() === 'yt') {
-                  defaults.income = '500';
-                  defaults.expense = '344';
-                  defaults.profit = (500 - 344).toString();
-                } else if (manager.platform.toLowerCase() === 'spotify') {
-                  defaults.income = '400';
-                  defaults.expense = '254';
-                  defaults.profit = (400 - 254).toString();
-                }
-                setCustomerForm(defaults);
-              } else {
-                setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' });
-              }
-              setShowAddModal(true);
+              const exportData = customers.map(c => ({
+                Name: c.name,
+                Username: c.username,
+                Email: c.email,
+                Phone: c.phone,
+                'Renewal Date': c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '',
+                Income: c.income,
+                Expense: c.expense,
+                Profit: c.profit,
+                Notes: c.notes
+              }));
+              const ws = XLSX.utils.json_to_sheet(exportData);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+              XLSX.writeFile(wb, `customers_${manager.display_name || manager.username || 'export'}.xlsx`);
             }}
-            className="bg-cyan-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-cyan-800 shadow"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 shadow"
           >
-            Add Customer
+            Export to Excel
           </button>
-        ) : (
-          <span className="text-red-600 font-semibold">All slots are filled for this plan manager.</span>
-        )}
+        </div>
       </div>
       <div className="mb-10">
         {customers.length === 0 ? (
@@ -748,6 +781,12 @@ const PlanManagerDetail: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">Address</label>
                   <input name="address" value={editForm.address || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
                 </div>
+                {editForm.platform && editForm.platform.toLowerCase() === 'spotify' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Spotify Username</label>
+                    <input name="username" value={editForm.username || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
@@ -806,6 +845,12 @@ const PlanManagerDetail: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">Profit</label>
                   <input name="profit" type="number" value={editCustomerForm.profit || ''} onChange={handleEditCustomerFormChange} required className="w-full border rounded-lg px-3 py-2" />
                 </div>
+                {manager.platform === 'spotify' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Spotify Username</label>
+                    <input name="username" value={editCustomerForm.username || ''} onChange={handleEditCustomerFormChange} className="w-full border rounded-lg px-3 py-2" />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>

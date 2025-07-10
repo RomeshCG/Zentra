@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../service/supabaseClient';
+import * as XLSX from 'xlsx';
 
 const Subscriptions: React.FC = () => {
   const [managers, setManagers] = useState<any[]>([]);
@@ -150,6 +151,26 @@ const Subscriptions: React.FC = () => {
           onChange={e => { setRenewalDate(e.target.value); setShowThisWeek(false); }}
           className="border rounded px-3 py-2"
         />
+        <button
+          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 shadow"
+          onClick={() => {
+            const exportData = filtered.map(m => ({
+              Name: m.display_name,
+              Email: m.email,
+              Phone: m.phone,
+              Platform: m.platform,
+              'Renewal Date': m.renewal_date ? new Date(m.renewal_date).toLocaleDateString() : '-',
+              'Monthly Cost': m.monthly_cost,
+              Notes: m.notes,
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Subscriptions');
+            XLSX.writeFile(wb, `subscriptions_export.xlsx`);
+          }}
+        >
+          Export to Excel
+        </button>
       </div>
       {/* Table wrapper with horizontal scroll always visible */}
       <div className="w-full rounded-xl shadow-md bg-white overflow-x-scroll">
