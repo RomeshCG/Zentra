@@ -1,9 +1,16 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
-  return (
-    <nav className="h-screen w-56 bg-slate-900 text-white flex flex-col py-6 px-3 fixed top-0 left-0 z-10">
+interface SidebarProps {
+  onLogout?: () => void;
+  open?: boolean;
+  onClose?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onLogout, open = false, onClose }) => {
+  // Sidebar content
+  const content = (
+    <nav className="h-full w-56 bg-slate-900 text-white flex flex-col py-6 px-3">
       <div className="mb-8 text-2xl font-bold tracking-wide text-center text-cyan-400">Zentra</div>
       <div className="flex-1 flex flex-col gap-6">
         <div>
@@ -42,6 +49,35 @@ const Sidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
         Logout
       </button>
     </nav>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex h-screen w-56 fixed top-0 left-0 z-10">
+        {content}
+      </div>
+      {/* Mobile drawer */}
+      {open && (
+        <div className="md:hidden fixed inset-0 z-30 flex">
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-black bg-opacity-40" onClick={onClose} />
+          {/* Drawer */}
+          <div className="relative w-56 h-full bg-slate-900 shadow-lg animate-slideInLeft">
+            {/* Close button */}
+            <button
+              className="absolute top-3 right-3 text-white text-2xl focus:outline-none"
+              onClick={onClose}
+              aria-label="Close sidebar"
+              type="button"
+            >
+              &times;
+            </button>
+            {content}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

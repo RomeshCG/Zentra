@@ -30,6 +30,7 @@ const PlanManagers: React.FC = () => {
     renewal_date: '',
     renewal_period: '',
     is_active: true,
+    address: '', // new field
   });
   // Managers state
   const [managers, setManagers] = useState<any[]>([]);
@@ -100,6 +101,7 @@ const PlanManagers: React.FC = () => {
       renewal_date: form.renewal_date || null,
       renewal_period: form.renewal_period,
       is_active: form.is_active,
+      address: form.platform === 'spotify' ? form.address : null,
     };
     const { error } = await supabase.from('plan_managers').insert([insertData]);
     if (error) {
@@ -120,6 +122,7 @@ const PlanManagers: React.FC = () => {
       renewal_date: '',
       renewal_period: '',
       is_active: true,
+      address: '',
     });
     await fetchManagers();
     setLoading(false);
@@ -175,6 +178,7 @@ const PlanManagers: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">Username</label>
                   <input name="username" value={form.username} onChange={handleChange} required className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />
                 </div>
+                {/* Remove Username field for manager */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Email</label>
                   <input name="email" type="email" value={form.email} onChange={handleChange} required className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />
@@ -192,6 +196,12 @@ const PlanManagers: React.FC = () => {
                     ))}
                   </select>
                 </div>
+                {form.platform === 'spotify' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <input name="address" value={form.address} onChange={handleChange} className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium mb-1">Plan Price</label>
                   <input name="plan_price" type="number" value={form.plan_price} onChange={handleChange} required className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />

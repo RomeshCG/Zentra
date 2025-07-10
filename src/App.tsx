@@ -41,14 +41,45 @@ function PrivateRoute({ children }: { children: ReactNode }) {
 
 const AppLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
+
+  // Close sidebar on route change (for mobile UX)
+  const location = useLocation();
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location]);
+
   return (
-    <div style={{ display: 'flex' }}>
-      <Sidebar onLogout={handleLogout} />
-      <main style={{ marginLeft: 220, flex: 1, padding: '32px' }}>{children}</main>
+    <div className="flex min-h-screen">
+      {/* Sidebar for desktop, drawer for mobile */}
+      <Sidebar
+        onLogout={handleLogout}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+      {/* Hamburger for mobile */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-20 bg-slate-900 text-white p-2 rounded-lg shadow focus:outline-none"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open sidebar"
+        type="button"
+      >
+        <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      {/* Main content */}
+      <main
+        className="flex-1 w-full md:ml-56 transition-all duration-300 px-2 sm:px-4 md:px-8 py-8"
+        style={{ minHeight: '100vh' }}
+      >
+        {children}
+      </main>
     </div>
   );
 };

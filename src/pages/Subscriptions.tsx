@@ -151,8 +151,9 @@ const Subscriptions: React.FC = () => {
           className="border rounded px-3 py-2"
         />
       </div>
-      <div className="w-full rounded-xl shadow-md bg-white">
-        <table className="w-full border-separate border-spacing-0 text-sm rounded-xl">
+      {/* Table wrapper with horizontal scroll always visible */}
+      <div className="w-full rounded-xl shadow-md bg-white overflow-x-scroll">
+        <table className="min-w-[900px] w-full border-separate border-spacing-0 text-sm rounded-xl">
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">Name</th>

@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../service/supabaseClient';
 
 const PlanManagerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const highlightId = params.get('highlight');
   const [manager, setManager] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +21,7 @@ const PlanManagerDetail: React.FC = () => {
     expense: '',
     profit: '',
     notes: '',
+    username: '', // new field
   });
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [customerError, setCustomerError] = useState<string | null>(null);
@@ -42,6 +46,7 @@ const PlanManagerDetail: React.FC = () => {
   const [editCustomerLoading, setEditCustomerLoading] = useState(false);
   const [editCustomerError, setEditCustomerError] = useState<string | null>(null);
   const [editRenewMonths, setEditRenewMonths] = useState(1);
+  const [flaggedCustomerIds, setFlaggedCustomerIds] = useState<string[]>([]);
 
   // Auto-calculate renewal date unless manually overridden
   useEffect(() => {
@@ -232,6 +237,7 @@ const PlanManagerDetail: React.FC = () => {
       notes: customerForm.notes,
       platform: manager.platform,
       manager_plan_id: manager.id,
+      username: manager.platform === 'spotify' ? customerForm.username : '',
     };
     if (editingCustomerId) {
       // Update
@@ -241,7 +247,7 @@ const PlanManagerDetail: React.FC = () => {
         setCustomerLoading(false);
         return;
       }
-      setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '' });
+      setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' });
       setEditingCustomerId(null);
       // Refresh customers
       const { data: customerDataNew } = await supabase
@@ -264,7 +270,7 @@ const PlanManagerDetail: React.FC = () => {
         return;
       }
       const insertedCustomer = data && data[0];
-      setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '' });
+      setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' });
       setEditingCustomerId(null);
       // Refresh customers
       const { data: customerDataNew } = await supabase
@@ -295,6 +301,7 @@ const PlanManagerDetail: React.FC = () => {
       expense: customer.expense?.toString() || '',
       profit: customer.profit?.toString() || '',
       notes: customer.notes || '',
+      username: customer.username || '',
     });
   };
 
@@ -449,12 +456,36 @@ const PlanManagerDetail: React.FC = () => {
     setEditRenewMonths(1);
   };
 
+  // Permanent flag/unflag handler
+  const toggleFlagCustomer = async (customerId: string, currentFlag: boolean) => {
+    await supabase.from('customers').update({ is_flagged: !currentFlag }).eq('id', customerId);
+    // Refresh customers
+    const { data: customerDataNew } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('manager_plan_id', id)
+      .order('created_at', { ascending: false });
+    setCustomers(customerDataNew || []);
+  };
+
+  const handleToggleActiveCustomer = async (customerId: string, currentActive: boolean) => {
+    await supabase.from('customers').update({ is_active: !currentActive }).eq('id', customerId);
+    // Refresh customers
+    const { data: customerDataNew } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('manager_plan_id', id)
+      .order('created_at', { ascending: false });
+    setCustomers(customerDataNew || []);
+  };
+
   if (loading) return <div className="p-8 text-slate-500">Loading...</div>;
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!manager) return <div className="p-8 text-slate-500">Manager not found.</div>;
 
-  // Calculate remaining slots
-  const remainingSlots = manager && manager.slots_total ? manager.slots_total - customers.length : 0;
+  // Calculate remaining slots (only active customers count)
+  const activeCustomers = customers.filter((c: any) => c.is_active !== false);
+  const remainingSlots = manager && manager.slots_total ? manager.slots_total - activeCustomers.length : 0;
 
   return (
     <div className="w-full px-8 py-8">
@@ -496,11 +527,12 @@ const PlanManagerDetail: React.FC = () => {
         {customers.length === 0 ? (
           <div className="text-slate-400 mb-4">No customers assigned yet.</div>
         ) : (
-          <div className="w-full rounded-xl shadow-md bg-white">
-            <table className="w-full border-separate border-spacing-0 text-sm rounded-xl">
+          <div className="w-full rounded-xl shadow-md bg-white overflow-x-auto">
+            <table className="min-w-[900px] w-full border-separate border-spacing-0 text-sm rounded-xl">
               <thead className="bg-slate-100 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold">Name</th>
+                  <th className="px-4 py-3 text-left font-semibold">Username</th>
                   <th className="px-4 py-3 text-left font-semibold">Email</th>
                   <th className="px-4 py-3 text-left font-semibold">Phone</th>
                   <th className="px-4 py-3 text-left font-semibold">Renewal Date</th>
@@ -513,24 +545,49 @@ const PlanManagerDetail: React.FC = () => {
               </thead>
               <tbody>
                 {customers.length === 0 ? (
-                  <tr><td colSpan={9} className="text-center text-slate-400 py-4">No customers assigned yet.</td></tr>
+                  <tr><td colSpan={10} className="text-center text-slate-400 py-4">No customers assigned yet.</td></tr>
                 ) : customers.map((c, idx) => (
                   <tr
                     key={c.id}
-                    className={idx % 2 === 0 ? 'bg-white hover:bg-slate-50 cursor-pointer' : 'bg-slate-50 hover:bg-slate-100 cursor-pointer'}
+                    className={
+                      (idx % 2 === 0 ? 'bg-white hover:bg-slate-50 cursor-pointer' : 'bg-slate-50 hover:bg-slate-100 cursor-pointer') +
+                      (highlightId === c.id ? ' ring-2 ring-cyan-500' : '') +
+                      (c.is_active === false ? ' opacity-50' : '')
+                    }
                     onClick={() => openEditCustomerModal(c)}
                   >
                     <td className="px-4 py-2 font-medium text-cyan-700 whitespace-nowrap max-w-[140px] truncate" title={c.name}>{c.name}</td>
+                    <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate" title={c.username || ''}>{c.username || ''}</td>
                     <td className="px-4 py-2 whitespace-nowrap max-w-[180px] truncate" title={c.email}>{c.email}</td>
                     <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate" title={c.phone}>{c.phone}</td>
                     <td className="px-4 py-2 whitespace-nowrap">{c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}</td>
                     <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.income).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.expense).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.profit).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-4 py-2 max-w-[300px] whitespace-pre-line break-words" title={c.notes}>{c.notes}</td>
+                    <td className="px-4 py-2 max-w-[300px] whitespace-pre-line break-words" title={c.notes}>{c.notes} {c.is_active === false && <span className="ml-2 inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">Inactive</span>}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span className="text-blue-700 hover:underline mr-3">Edit</span>
                       <span className="text-red-600 hover:underline" onClick={e => { e.stopPropagation(); handleDeleteCustomer(c.id); }}>Delete</span>
+                      <button
+                        type="button"
+                        className={`ml-2 inline-block px-2 py-1 text-xs rounded ${c.is_flagged ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-700'}`}
+                        onClick={e => { e.stopPropagation(); toggleFlagCustomer(c.id, c.is_flagged); }}
+                      >
+                        {c.is_flagged ? 'Unflag' : 'Flag'}
+                      </button>
+                      {c.is_flagged && (
+                        <span className="ml-2 inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Flagged</span>
+                      )}
+                      {highlightId === c.id && (
+                        <span className="ml-2 inline-block px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded">Highlighted</span>
+                      )}
+                      <button
+                        type="button"
+                        className={`ml-2 inline-block px-2 py-1 text-xs rounded ${c.is_active === false ? 'bg-gray-300 text-gray-700' : 'bg-green-200 text-green-800'}`}
+                        onClick={e => { e.stopPropagation(); handleToggleActiveCustomer(c.id, c.is_active); }}
+                      >
+                        {c.is_active === false ? 'Activate' : 'Deactivate'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -594,6 +651,12 @@ const PlanManagerDetail: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">Profit</label>
                   <input name="profit" type="number" value={customerForm.profit} onChange={handleCustomerChange} required className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />
                 </div>
+                {manager.platform === 'spotify' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Spotify Username</label>
+                    <input name="username" value={customerForm.username} onChange={handleCustomerChange} required className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>

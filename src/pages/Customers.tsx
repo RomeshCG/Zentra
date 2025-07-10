@@ -152,8 +152,9 @@ const Customers: React.FC = () => {
           className="border rounded px-3 py-2"
         />
       </div>
-      <div className="w-full rounded-xl shadow-md bg-white">
-        <table className="w-full border-separate border-spacing-0 text-sm rounded-xl">
+      {/* Table wrapper with horizontal scroll always visible */}
+      <div className="w-full rounded-xl shadow-md bg-white overflow-x-scroll">
+        <table className="min-w-[900px] w-full border-separate border-spacing-0 text-sm rounded-xl">
           <thead className="bg-slate-100 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">Name</th>
@@ -166,13 +167,14 @@ const Customers: React.FC = () => {
               <th className="px-4 py-3 text-left font-semibold">Expense</th>
               <th className="px-4 py-3 text-left font-semibold">Profit</th>
               <th className="px-4 py-3 text-left font-semibold">Notes</th>
+              <th className="px-4 py-3 text-left font-semibold">Flagged</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="text-center text-slate-400 py-4">Loading...</td></tr>
+              <tr><td colSpan={11} className="text-center text-slate-400 py-4">Loading...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center text-slate-400 py-4">No customers found.</td></tr>
+              <tr><td colSpan={11} className="text-center text-slate-400 py-4">No customers found.</td></tr>
             ) : filtered.map((c, idx) => {
               let highlight = '';
               if (c.renewal_date) {
@@ -199,6 +201,9 @@ const Customers: React.FC = () => {
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.expense).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.profit).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="px-4 py-2 max-w-[300px] whitespace-pre-line break-words" title={c.notes}>{c.notes}</td>
+                  <td className="px-4 py-2 text-center">
+                    {c.is_flagged ? <span className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Flagged</span> : ''}
+                  </td>
                 </tr>
               );
             })}
@@ -248,6 +253,12 @@ const Customers: React.FC = () => {
                   <input name="profit" type="number" value={editForm.profit || ''} onChange={handleEditFormChange} required className="w-full border rounded-lg px-3 py-2" />
                 </div>
               </div>
+              {managerMap[editForm.manager_plan_id]?.platform === 'spotify' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Spotify Username</label>
+                  <input name="username" value={editForm.username || ''} onChange={handleEditFormChange} className="w-full border rounded-lg px-3 py-2" />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
                 <textarea name="notes" value={editForm.notes || ''} onChange={handleEditFormChange} className="w-full border rounded-lg px-3 py-2" />
