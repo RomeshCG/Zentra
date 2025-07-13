@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../service/supabaseClient';
 import * as XLSX from 'xlsx';
+import PlanManagerFinancialHistory from '../components/PlanManagerFinancialHistory.tsx';
 
 const PlanManagerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +49,18 @@ const PlanManagerDetail: React.FC = () => {
   const [editCustomerError, setEditCustomerError] = useState<string | null>(null);
   const [editRenewMonths, setEditRenewMonths] = useState(1);
   const [flaggedCustomerIds, setFlaggedCustomerIds] = useState<string[]>([]);
+  const [showRenewOverrideModal, setShowRenewOverrideModal] = useState(false);
+  const [renewOverrideValues, setRenewOverrideValues] = useState({ income: '', expense: '', profit: '' });
+  const [renewingCustomer, setRenewingCustomer] = useState<any>(null);
+  // Add state for plan manager renewal modal and form
+  const [showRenewManagerModal, setShowRenewManagerModal] = useState(false);
+  const [renewManagerValues, setRenewManagerValues] = useState({
+    expense: '',
+    profit: '',
+    notes: '',
+  });
+  const [renewManagerLoading, setRenewManagerLoading] = useState(false);
+  const [renewManagerError, setRenewManagerError] = useState<string | null>(null);
 
   // Auto-calculate renewal date unless manually overridden
   useEffect(() => {
@@ -123,24 +136,6 @@ const PlanManagerDetail: React.FC = () => {
     return result;
   }
 
-  // Utility: Fetch price for a platform for a given month
-  async function getPriceForMonth(platform: string, month: string) {
-    const { data: priceHistory } = await supabase
-      .from('platform_price_history')
-      .select('*')
-      .eq('platform', platform)
-      .order('effective_from', { ascending: true });
-    if (!priceHistory || priceHistory.length === 0) return null;
-    // Find the latest price effective before or on this month
-    const monthDate = new Date(month);
-    let price = priceHistory[0].price;
-    for (const row of priceHistory) {
-      if (new Date(row.effective_from) <= monthDate) price = row.price;
-      else break;
-    }
-    return Number(price);
-  }
-
   // Utility: Check if plan manager is new (<1 month)
   function isManagerNew(manager: any) {
     if (!manager?.created_at) return false;
@@ -179,9 +174,8 @@ const PlanManagerDetail: React.FC = () => {
     const records = [];
     for (let i = 0; i < monthList.length; i++) {
       const month = monthList[i];
-      let priceUsed = await getPriceForMonth(planManager.platform, month);
-      if (priceUsed == null) priceUsed = planManager.monthly_cost;
-      let expense = (isTrial && i === 0) ? 0 : priceUsed;
+      // Remove priceUsed and getPriceForMonth logic
+      let expense = (isTrial && i === 0) ? 0 : (planManager.monthly_cost || 0);
       if (expense == null || isNaN(expense)) expense = 0;
       const profit = perMonthIncome - expense;
       records.push({
@@ -190,7 +184,6 @@ const PlanManagerDetail: React.FC = () => {
         income: perMonthIncome,
         expense,
         profit,
-        price_used: priceUsed,
         is_trial: isTrial && i === 0,
       });
     }
@@ -352,6 +345,7 @@ const PlanManagerDetail: React.FC = () => {
       is_active: editForm.is_active,
       notes: editForm.notes,
       address: editForm.address,
+      bank_card: editForm.bank_card || null, // new field
     };
     const { error } = await supabase.from('plan_managers').update(updateData).eq('id', manager.id);
     if (error) {
@@ -446,6 +440,10 @@ const PlanManagerDetail: React.FC = () => {
       setEditCustomerLoading(false);
       return;
     }
+    // Insert new customer_subscription_months record for renewal
+    if (manager) {
+      await createCustomerMonths({ ...editCustomer, ...editCustomerForm, renewal_date: nextRenewal }, manager);
+    }
     // Refresh customers
     const { data: customerDataNew } = await supabase
       .from('customers')
@@ -481,6 +479,69 @@ const PlanManagerDetail: React.FC = () => {
     setCustomers(customerDataNew || []);
   };
 
+  const openRenewOverrideModal = (customer: any) => {
+    setRenewingCustomer(customer);
+    setRenewOverrideValues({
+      income: customer.income?.toString() || '',
+      expense: manager?.monthly_cost?.toString() || '',
+      profit: customer.profit?.toString() || '',
+    });
+    setShowRenewOverrideModal(true);
+  };
+
+  const handleRenewOverrideChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setRenewOverrideValues((prev) => {
+      let updated = { ...prev, [name]: value };
+      if ((name === 'income' || name === 'expense')) {
+        const income = name === 'income' ? Number(value) : Number(updated.income);
+        const expense = name === 'expense' ? Number(value) : Number(updated.expense);
+        if (!isNaN(income) && !isNaN(expense)) {
+          updated.profit = (income - expense).toString();
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleConfirmRenewOverride = async () => {
+    if (!renewingCustomer || !renewOverrideValues.income || !renewOverrideValues.expense || !renewOverrideValues.profit) return;
+    setEditCustomerLoading(true);
+    setEditCustomerError(null);
+    // Calculate next renewal date
+    const current = new Date(renewingCustomer.renewal_date);
+    current.setMonth(current.getMonth() + 1);
+    const nextRenewal = current.toISOString().slice(0, 10);
+    // Update customer renewal_date
+    const { error } = await supabase.from('customers').update({ ...renewingCustomer, renewal_date: nextRenewal }).eq('id', renewingCustomer.id);
+    if (error) {
+      setEditCustomerError(error.message);
+      setEditCustomerLoading(false);
+      return;
+    }
+    // Insert new customer_subscription_months record with override values
+    await supabase.from('customer_subscription_months').insert({
+      customer_id: renewingCustomer.id,
+      month: nextRenewal,
+      income: Number(renewOverrideValues.income),
+      expense: Number(renewOverrideValues.expense),
+      profit: Number(renewOverrideValues.profit),
+      is_trial: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    // Refresh customers
+    const { data: customerDataNew } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('manager_plan_id', id)
+      .order('created_at', { ascending: false });
+    setCustomers(customerDataNew || []);
+    setEditCustomerLoading(false);
+    setShowRenewOverrideModal(false);
+    setRenewingCustomer(null);
+  };
+
   if (loading) return <div className="p-8 text-slate-500">Loading...</div>;
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!manager) return <div className="p-8 text-slate-500">Manager not found.</div>;
@@ -495,17 +556,34 @@ const PlanManagerDetail: React.FC = () => {
       <div className="bg-white rounded-xl shadow p-6 mb-8">
         <div className="flex items-center justify-between mb-2">
           <div className="text-2xl font-bold text-cyan-800">{manager.display_name || manager.username}</div>
-          <button onClick={handleOpenEditModal} className="text-cyan-700 hover:underline text-base">Edit</button>
+          <div className="flex gap-2 items-center">
+            <button onClick={handleOpenEditModal} className="text-cyan-700 hover:underline text-base">Edit</button>
+            <button
+              onClick={() => navigate(`/plan-managers/${manager.id}/history`)}
+              className="ml-2 px-3 py-1 rounded bg-cyan-700 text-white text-xs font-semibold hover:bg-cyan-800"
+            >
+              View History
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap gap-4 text-sm mb-2">
           <div><span className="font-medium">Platform:</span> {manager.platform}</div>
           <div><span className="font-medium">Slots:</span> {manager.slots_total} <span className={remainingSlots > 0 ? 'text-green-600' : 'text-red-600'}>({remainingSlots > 0 ? `${remainingSlots} remaining` : 'Full'})</span></div>
           <div><span className="font-medium">Price:</span> Rs.{manager.monthly_cost}</div>
+          <div><span className="font-medium">Bank Card:</span> {manager.bank_card || '-'}</div>
           <div>
             <span className="font-medium">Renewal:</span> {manager.renewal_period}
             <span className="ml-2 font-medium">Renewal Date:</span> {manager.renewal_date ? new Date(manager.renewal_date).toLocaleDateString() : '-'}
             <button
-              onClick={handleMarkAsRenewed}
+              onClick={() => {
+                setRenewManagerError(null);
+                setRenewManagerValues({
+                  expense: manager?.monthly_cost?.toString() || '',
+                  profit: manager?.monthly_cost ? (-manager.monthly_cost).toString() : '',
+                  notes: '',
+                });
+                setShowRenewManagerModal(true);
+              }}
               disabled={renewLoading}
               className="ml-2 px-2 py-1 rounded bg-green-600 text-white text-xs font-semibold hover:bg-green-700 disabled:opacity-60"
             >
@@ -600,6 +678,7 @@ const PlanManagerDetail: React.FC = () => {
                   <th className="px-4 py-3 text-left font-semibold">Profit</th>
                   <th className="px-4 py-3 text-left font-semibold">Notes</th>
                   <th className="px-4 py-3 text-left font-semibold">Actions</th>
+                  <th className="px-4 py-3 text-left font-semibold">View</th>
                 </tr>
               </thead>
               <tbody>
@@ -646,6 +725,14 @@ const PlanManagerDetail: React.FC = () => {
                         onClick={e => { e.stopPropagation(); handleToggleActiveCustomer(c.id, c.is_active); }}
                       >
                         {c.is_active === false ? 'Activate' : 'Deactivate'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <button
+                        className="bg-cyan-700 text-white px-3 py-1 rounded hover:bg-cyan-800 text-xs font-semibold"
+                        onClick={e => { e.stopPropagation(); navigate(`/customers/${c.id}`); }}
+                      >
+                        View
                       </button>
                     </td>
                   </tr>
@@ -781,6 +868,10 @@ const PlanManagerDetail: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">Address</label>
                   <input name="address" value={editForm.address || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Bank Card</label>
+                  <input name="bank_card" value={editForm.bank_card || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
+                </div>
                 {editForm.platform && editForm.platform.toLowerCase() === 'spotify' && (
                   <div>
                     <label className="block text-sm font-medium mb-1">Spotify Username</label>
@@ -858,20 +949,127 @@ const PlanManagerDetail: React.FC = () => {
               </div>
               <div className="flex justify-between gap-2 mt-4">
                 <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    value={editRenewMonths}
-                    onChange={e => setEditRenewMonths(Number(e.target.value))}
-                    className="border rounded px-2 py-1 w-16"
-                    style={{ minWidth: 60 }}
-                  />
-                  <span className="text-sm">months</span>
-                  <button type="button" onClick={handleEditCustomerMarkAsRenewed} disabled={editCustomerLoading} className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 shadow disabled:opacity-60">{editCustomerLoading ? 'Updating...' : 'Mark as Renewed'}</button>
+                  {/* Removed months input */}
                 </div>
                 <button type="submit" disabled={editCustomerLoading} className="bg-cyan-700 text-white px-6 py-2 rounded-lg font-semibold hover:bg-cyan-800 shadow disabled:opacity-60">{editCustomerLoading ? 'Saving...' : 'Save Changes'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showRenewOverrideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 transition">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fadeIn">
+            <button
+              onClick={() => setShowRenewOverrideModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 text-2xl font-bold"
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h2 className="text-lg font-semibold mb-4">Renew Customer - Override Financials</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Income</label>
+              <input name="income" type="number" value={renewOverrideValues.income} onChange={handleRenewOverrideChange} className="w-full border rounded-lg px-3 py-2 mb-2" />
+              <label className="block text-sm font-medium mb-1">Expense</label>
+              <input name="expense" type="number" value={renewOverrideValues.expense} onChange={handleRenewOverrideChange} className="w-full border rounded-lg px-3 py-2 mb-2" />
+              <label className="block text-sm font-medium mb-1">Profit</label>
+              <input name="profit" type="number" value={renewOverrideValues.profit} onChange={handleRenewOverrideChange} className="w-full border rounded-lg px-3 py-2" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowRenewOverrideModal(false)} className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-semibold hover:bg-slate-300 shadow">Cancel</button>
+              <button onClick={handleConfirmRenewOverride} disabled={editCustomerLoading} className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 shadow disabled:opacity-60">
+                {editCustomerLoading ? 'Renewing...' : 'Confirm Renewal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRenewManagerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 transition">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative animate-fadeIn">
+            <button
+              onClick={() => setShowRenewManagerModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 text-2xl font-bold"
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h2 className="text-lg font-semibold mb-4">Renew Plan Manager - Override Financials</h2>
+            {renewManagerError && <div className="mb-2 text-red-600">{renewManagerError}</div>}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Expense</label>
+              <input
+                name="expense"
+                type="number"
+                value={renewManagerValues.expense}
+                onChange={e => setRenewManagerValues(v => ({ ...v, expense: e.target.value, profit: v.profit }))}
+                className="w-full border rounded-lg px-3 py-2 mb-2"
+              />
+              <label className="block text-sm font-medium mb-1">Profit</label>
+              <input
+                name="profit"
+                type="number"
+                value={renewManagerValues.profit}
+                onChange={e => setRenewManagerValues(v => ({ ...v, profit: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 mb-2"
+              />
+              <label className="block text-sm font-medium mb-1">Notes</label>
+              <textarea
+                name="notes"
+                value={renewManagerValues.notes}
+                onChange={e => setRenewManagerValues(v => ({ ...v, notes: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowRenewManagerModal(false)} className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-semibold hover:bg-slate-300 shadow">Cancel</button>
+              <button
+                onClick={async () => {
+                  if (!manager || !manager.renewal_date || !renewManagerValues.expense || !renewManagerValues.profit) {
+                    setRenewManagerError('Expense and profit are required.');
+                    return;
+                  }
+                  setRenewManagerLoading(true);
+                  setRenewManagerError(null);
+                  try {
+                    // Calculate next renewal date
+                    const current = new Date(manager.renewal_date);
+                    current.setMonth(current.getMonth() + 1);
+                    const nextRenewal = current.toISOString().slice(0, 10);
+                    // Update plan manager renewal_date
+                    const { error: updateError } = await supabase.from('plan_managers').update({ renewal_date: nextRenewal }).eq('id', manager.id);
+                    if (updateError) throw updateError;
+                    // Insert into plan_manager_financial_history
+                    const { error: insertError } = await supabase.from('plan_manager_financial_history').insert({
+                      plan_manager_id: manager.id,
+                      month: nextRenewal,
+                      expense: Number(renewManagerValues.expense),
+                      profit: Number(renewManagerValues.profit),
+                      notes: renewManagerValues.notes,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    });
+                    if (insertError) throw insertError;
+                    // Refresh manager info
+                    const { data: managerData } = await supabase
+                      .from('plan_managers')
+                      .select('*')
+                      .eq('id', manager.id)
+                      .single();
+                    setManager(managerData);
+                    setShowRenewManagerModal(false);
+                  } catch (err: any) {
+                    setRenewManagerError(err.message || 'Failed to renew');
+                  }
+                  setRenewManagerLoading(false);
+                }}
+                disabled={renewManagerLoading}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 shadow disabled:opacity-60"
+              >
+                {renewManagerLoading ? 'Renewing...' : 'Confirm Renewal'}
+              </button>
+            </div>
           </div>
         </div>
       )}

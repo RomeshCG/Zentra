@@ -13,6 +13,8 @@ import Sidebar from './components/Sidebar';
 import { supabase } from './service/supabaseClient';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import PlanManagerDetail from './pages/PlanManagerDetail';
+import CustomerDetail from './pages/CustomerDetail';
+import PlanManagerHistory from './pages/PlanManagerHistory.tsx';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -120,6 +122,16 @@ const App: React.FC = () => {
           }
         />
         <Route
+          path="/customers/:id"
+          element={
+            <PrivateRoute>
+              <AppLayout>
+                <CustomerDetail />
+              </AppLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/plan-managers"
           element={
             <PrivateRoute>
@@ -135,6 +147,16 @@ const App: React.FC = () => {
             <PrivateRoute>
               <AppLayout>
                 <PlanManagerDetail />
+              </AppLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/plan-managers/:id/history"
+          element={
+            <PrivateRoute>
+              <AppLayout>
+                <PlanManagerHistory />
               </AppLayout>
             </PrivateRoute>
           }

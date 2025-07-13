@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../service/supabaseClient';
 import * as XLSX from 'xlsx';
+import { useNavigate } from 'react-router-dom';
 
 const Customers: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -33,6 +34,7 @@ const Customers: React.FC = () => {
   // Map for quick lookup
   const managerMap = Object.fromEntries(managers.map((m: any) => [m.id, m]));
   const uniquePlatforms = Array.from(new Set(managers.map((m: any) => m.platform))).filter(Boolean);
+  const navigate = useNavigate();
 
   // Filtering logic
   const today = new Date();
@@ -193,11 +195,12 @@ const Customers: React.FC = () => {
               <th className="px-4 py-3 text-left font-semibold">Profit</th>
               <th className="px-4 py-3 text-left font-semibold">Notes</th>
               <th className="px-4 py-3 text-left font-semibold">Flagged</th>
+              <th className="px-4 py-3 text-left font-semibold">View</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className="text-center text-slate-400 py-4">Loading...</td></tr>
+              <tr><td colSpan={12} className="text-center text-slate-400 py-4">Loading...</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={11} className="text-center text-slate-400 py-4">No customers found.</td></tr>
             ) : filtered.map((c, idx) => {
@@ -228,6 +231,14 @@ const Customers: React.FC = () => {
                   <td className="px-4 py-2 max-w-[300px] whitespace-pre-line break-words" title={c.notes}>{c.notes}</td>
                   <td className="px-4 py-2 text-center">
                     {c.is_flagged ? <span className="inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Flagged</span> : ''}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    <button
+                      className="bg-cyan-700 text-white px-3 py-1 rounded hover:bg-cyan-800 text-xs font-semibold"
+                      onClick={() => navigate(`/customers/${c.id}`)}
+                    >
+                      View
+                    </button>
                   </td>
                 </tr>
               );

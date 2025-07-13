@@ -31,6 +31,7 @@ const PlanManagers: React.FC = () => {
     renewal_period: '',
     is_active: true,
     address: '', // new field
+    bank_card: '', // new field
   });
   // Managers state
   const [managers, setManagers] = useState<any[]>([]);
@@ -102,6 +103,7 @@ const PlanManagers: React.FC = () => {
       renewal_period: form.renewal_period,
       is_active: form.is_active,
       address: form.platform === 'spotify' ? form.address : null,
+      bank_card: form.bank_card || null, // new field
     };
     const { error } = await supabase.from('plan_managers').insert([insertData]);
     if (error) {
@@ -123,6 +125,7 @@ const PlanManagers: React.FC = () => {
       renewal_period: '',
       is_active: true,
       address: '',
+      bank_card: '',
     });
     await fetchManagers();
     setLoading(false);
@@ -145,6 +148,16 @@ const PlanManagers: React.FC = () => {
     if (slotFilter === 'full') slotOk = slotsLeft === 0;
     if (slotFilter === 'has') slotOk = slotsLeft > 0;
     return platformOk && slotOk;
+  });
+
+  // Sort: managers with remaining slots at the top, full at the bottom
+  const sortedManagers = [...filteredManagers].sort((a, b) => {
+    const slotsLeftA = a.slots_total - (customerCounts[a.id] || 0);
+    const slotsLeftB = b.slots_total - (customerCounts[b.id] || 0);
+    if (slotsLeftA > 0 && slotsLeftB === 0) return -1;
+    if (slotsLeftA === 0 && slotsLeftB > 0) return 1;
+    // If both have slots or both are full, keep original order
+    return 0;
   });
 
   return (
@@ -227,6 +240,10 @@ const PlanManagers: React.FC = () => {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Bank Card</label>
+                  <input name="bank_card" value={form.bank_card} onChange={handleChange} className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notes</label>
@@ -268,28 +285,54 @@ const PlanManagers: React.FC = () => {
         {loading && <div className="text-slate-500 mb-4">Loading...</div>}
         {error && <div className="text-red-600 mb-4">{error}</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredManagers.length === 0 && !loading ? (
+          {sortedManagers.length === 0 && !loading ? (
             <div className="border rounded-xl shadow p-8 text-center text-slate-400 bg-white">No managers yet.</div>
           ) : (
-            filteredManagers.map((m) => (
-              <div
-                key={m.id}
-                className="border rounded-xl shadow p-6 bg-white flex flex-col gap-2 hover:shadow-lg transition cursor-pointer"
-                onClick={() => handleManagerClick(m)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-lg font-semibold text-cyan-800">{m.display_name || m.username}</div>
-                  <span className="text-xs px-2 py-1 rounded bg-cyan-100 text-cyan-700">{m.platform}</span>
+            sortedManagers.map((m) => {
+              // Platform color logic
+              let platformColor = '';
+              let cardBorder = 'border-slate-200';
+              let cardShadow = 'shadow';
+              let slotsColor = '';
+              let bankCardColor = '';
+              // Remove logoBg and logoSvg
+              if (m.platform === 'spotify' || m.platform === 'Spotify') {
+                platformColor = 'text-green-600 font-bold';
+                cardBorder = 'border-green-400';
+                cardShadow = 'shadow-green-200';
+                slotsColor = 'text-green-700 font-bold';
+                bankCardColor = 'text-green-700 font-bold';
+              } else if (m.platform === 'youtube' || m.platform === 'YouTube') {
+                platformColor = 'text-red-600 font-bold';
+                cardBorder = 'border-red-400';
+                cardShadow = 'shadow-red-200';
+                slotsColor = 'text-red-700 font-bold';
+                bankCardColor = 'text-red-700 font-bold';
+              }
+              const slotsUsed = customerCounts[m.id] || 0;
+              const slotsLeft = m.slots_total - slotsUsed;
+              return (
+                <div
+                  key={m.id}
+                  className={`relative border-2 rounded-xl ${cardBorder} ${cardShadow} p-6 bg-white flex flex-col gap-2 hover:shadow-lg transition cursor-pointer`}
+                  onClick={() => handleManagerClick(m)}
+                >
+                  {/* Platform logo removed */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-lg font-semibold text-cyan-800">{m.display_name || m.username}</div>
+                    <span className="text-xs px-2 py-1 rounded bg-cyan-100 text-cyan-700">{m.platform}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-sm mt-2">
+                    <div><span className="font-medium">Slots:</span> {m.slots_total} (<span className={slotsLeft > 0 ? 'text-blue-700 font-bold' : slotsColor}>{slotsLeft > 0 ? `${slotsLeft} remaining` : 'Full'}</span>)</div>
+                    <div><span className="font-medium">Price:</span> {m.monthly_cost ? `Rs.${m.monthly_cost}` : '-'}</div>
+                    <div><span className="font-medium">Renewal:</span> {m.renewal_period ? m.renewal_period.charAt(0).toUpperCase() + m.renewal_period.slice(1) : '-'}</div>
+                    <div><span className="font-medium">Active:</span> {m.is_active ? 'Yes' : 'No'}</div>
+                    <div><span className="font-medium">Bank Card:</span> <span className={bankCardColor}>{m.bank_card || '-'}</span></div>
+                  </div>
+                  {m.notes && <div className="text-xs text-slate-500 mt-2">{m.notes}</div>}
                 </div>
-                <div className="flex flex-wrap gap-4 text-sm mt-2">
-                  <div><span className="font-medium">Slots:</span> {m.slots_total} <span className={((m.slots_total - (customerCounts[m.id] || 0)) > 0 ? 'text-green-600' : 'text-red-600')}>({(m.slots_total - (customerCounts[m.id] || 0)) > 0 ? `${m.slots_total - (customerCounts[m.id] || 0)} remaining` : 'Full'})</span></div>
-                  <div><span className="font-medium">Price:</span> {m.monthly_cost ? `Rs.${m.monthly_cost}` : '-'}</div>
-                  <div><span className="font-medium">Renewal:</span> {m.renewal_period ? m.renewal_period.charAt(0).toUpperCase() + m.renewal_period.slice(1) : '-'}</div>
-                  <div><span className="font-medium">Active:</span> {m.is_active ? 'Yes' : 'No'}</div>
-                </div>
-                {m.notes && <div className="text-xs text-slate-500 mt-2">{m.notes}</div>}
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

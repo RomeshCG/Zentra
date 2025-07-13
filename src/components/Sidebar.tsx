@@ -1,5 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { supabase } from '../service/supabaseClient';
+import { useEffect, useState } from 'react';
 
 interface SidebarProps {
   onLogout?: () => void;
@@ -8,6 +10,23 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onLogout, open = false, onClose }) => {
+  // System-wide totals
+  const [totals, setTotals] = useState<{income: number, expense: number, profit: number}>({income: 0, expense: 0, profit: 0});
+  useEffect(() => {
+    const fetchTotals = async () => {
+      const { data, error } = await supabase
+        .from('customer_subscription_months')
+        .select('income, expense, profit');
+      if (data && Array.isArray(data)) {
+        const totalIncome = data.reduce((sum, row) => sum + (Number(row.income) || 0), 0);
+        const totalExpense = data.reduce((sum, row) => sum + (Number(row.expense) || 0), 0);
+        const totalProfit = data.reduce((sum, row) => sum + (Number(row.profit) || 0), 0);
+        setTotals({ income: totalIncome, expense: totalExpense, profit: totalProfit });
+      }
+    };
+    fetchTotals();
+  }, []);
+
   // Sidebar content
   const content = (
     <nav className="h-full w-56 bg-slate-900 text-white flex flex-col py-6 px-3">
