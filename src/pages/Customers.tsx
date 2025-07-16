@@ -38,9 +38,27 @@ const Customers: React.FC = () => {
 
   // Filtering logic
   const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to midnight
   const weekFromNow = new Date();
   weekFromNow.setDate(today.getDate() + 7);
-  const filtered = customers.filter((c) => {
+
+  // Add status and sorting logic (copied from Dashboard)
+  type StatusType = 'Overdue' | 'Due Today' | 'Upcoming';
+  const customersWithStatus = customers
+    .filter((c) => c.is_active !== false && c.is_active !== 0)
+    .map((c) => {
+      let status: StatusType = 'Upcoming';
+      if (c.renewal_date) {
+        const renewalDate = new Date(c.renewal_date);
+        renewalDate.setHours(0, 0, 0, 0);
+        if (renewalDate < today) status = 'Overdue';
+        else if (renewalDate.getTime() === today.getTime()) status = 'Due Today';
+      }
+      return { ...c, status };
+    });
+
+  // Filtering (search, manager, platform, renewal date/week)
+  const filtered = customersWithStatus.filter((c) => {
     const matchesManager = managerFilter === 'all' || c.manager_plan_id === managerFilter;
     const matchesPlatform = platformFilter === 'all' || managerMap[c.manager_plan_id]?.platform === platformFilter;
     let matchesRenewal = true;
@@ -59,6 +77,18 @@ const Customers: React.FC = () => {
       c.phone?.toLowerCase().includes(q) ||
       c.notes?.toLowerCase().includes(q);
     return matchesManager && matchesPlatform && matchesRenewal && (!search || matchesSearch);
+  });
+
+  // Sort: Overdue first, then Due Today, then Upcoming
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const statusOrder: Record<StatusType, number> = { 'Overdue': 0, 'Due Today': 1, 'Upcoming': 2 };
+    if (statusOrder[a.status as StatusType] !== statusOrder[b.status as StatusType]) {
+      return statusOrder[a.status as StatusType] - statusOrder[b.status as StatusType];
+    }
+    // If same status, sort by renewal_date ascending
+    const aDate = a.renewal_date ? new Date(a.renewal_date) : new Date(0);
+    const bDate = b.renewal_date ? new Date(b.renewal_date) : new Date(0);
+    return aDate.getTime() - bDate.getTime();
   });
 
   // Edit modal logic
@@ -157,13 +187,14 @@ const Customers: React.FC = () => {
         <button
           className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 shadow"
           onClick={() => {
-            const exportData = filtered.map(c => ({
+            const exportData = sortedFiltered.map(c => ({
               Name: c.name,
               Email: c.email,
               Phone: c.phone,
               'Plan Manager': managerMap[c.manager_plan_id]?.display_name || managerMap[c.manager_plan_id]?.platform || '-',
               Platform: managerMap[c.manager_plan_id]?.platform || '-',
               'Renewal Date': c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-',
+              Status: c.status,
               Income: c.income,
               Expense: c.expense,
               Profit: c.profit,
@@ -190,6 +221,7 @@ const Customers: React.FC = () => {
               <th className="px-4 py-3 text-left font-semibold">Plan Manager</th>
               <th className="px-4 py-3 text-left font-semibold">Platform</th>
               <th className="px-4 py-3 text-left font-semibold">Renewal Date</th>
+              <th className="px-4 py-3 text-left font-semibold">Status</th>
               <th className="px-4 py-3 text-left font-semibold">Income</th>
               <th className="px-4 py-3 text-left font-semibold">Expense</th>
               <th className="px-4 py-3 text-left font-semibold">Profit</th>
@@ -200,31 +232,28 @@ const Customers: React.FC = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={12} className="text-center text-slate-400 py-4">Loading...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={11} className="text-center text-slate-400 py-4">No customers found.</td></tr>
-            ) : filtered.map((c, idx) => {
-              let highlight = '';
-              if (c.renewal_date) {
-                const today = new Date();
-                const renewal = new Date(c.renewal_date);
-                const diffDays = Math.ceil((renewal.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays >= 0 && diffDays <= 7) {
-                  highlight = 'bg-red-100';
-                }
-              }
+              <tr><td colSpan={13} className="text-center text-slate-400 py-5 text-base">Loading...</td></tr>
+            ) : sortedFiltered.length === 0 ? (
+              <tr><td colSpan={13} className="text-center text-slate-400 py-5 text-base">No customers found.</td></tr>
+            ) : sortedFiltered.map((c) => {
+              // Row coloring and badge logic
+              let rowClass = '';
+              if (c.status === 'Overdue') rowClass = 'bg-red-50 hover:bg-red-100';
+              else if (c.status === 'Due Today') rowClass = 'bg-green-50 hover:bg-green-100';
+              else rowClass = 'hover:bg-cyan-50';
+              let statusBadge = null;
+              if (c.status === 'Overdue') statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold text-xs">Overdue</span>;
+              else if (c.status === 'Due Today') statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold text-xs">Due Today</span>;
+              else statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 font-semibold text-xs">Upcoming</span>;
               return (
-                <tr
-                  key={c.id}
-                  className={`${idx % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50 hover:bg-slate-100'} cursor-pointer ${highlight}`}
-                  onClick={() => openEditModal(c)}
-                >
-                  <td className="px-4 py-2 font-medium text-cyan-700 whitespace-nowrap max-w-[140px] truncate" title={c.name}>{c.name}</td>
-                  <td className="px-4 py-2 whitespace-nowrap max-w-[180px] truncate" title={c.email}>{c.email}</td>
-                  <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate" title={c.phone}>{c.phone}</td>
-                  <td className="px-4 py-2 whitespace-nowrap max-w-[180px] truncate" title={managerMap[c.manager_plan_id]?.display_name || managerMap[c.manager_plan_id]?.platform || '-'}>{managerMap[c.manager_plan_id]?.display_name || managerMap[c.manager_plan_id]?.platform || '-'}</td>
-                  <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate" title={managerMap[c.manager_plan_id]?.platform || '-'}>{managerMap[c.manager_plan_id]?.platform || '-'}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">{c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}</td>
+                <tr key={c.id} className={`border-t transition cursor-pointer ${rowClass}`}>
+                  <td className="px-4 py-2 font-semibold text-cyan-800 whitespace-nowrap max-w-[130px] truncate" title={c.name}>{c.name}</td>
+                  <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.email}>{c.email}</td>
+                  <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.phone}>{c.phone}</td>
+                  <td className="px-4 py-2 whitespace-nowrap">{managerMap[c.manager_plan_id]?.display_name || managerMap[c.manager_plan_id]?.platform || '-'}</td>
+                  <td className="px-4 py-2 whitespace-nowrap">{managerMap[c.manager_plan_id]?.platform || '-'}</td>
+                  <td className="px-4 py-2 whitespace-nowrap font-mono text-sm">{c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}</td>
+                  <td className="px-4 py-2 whitespace-nowrap">{statusBadge}</td>
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.income).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.expense).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.profit).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
@@ -234,8 +263,8 @@ const Customers: React.FC = () => {
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     <button
-                      className="bg-cyan-700 text-white px-3 py-1 rounded hover:bg-cyan-800 text-xs font-semibold"
-                      onClick={() => navigate(`/customers/${c.id}`)}
+                      className="bg-cyan-700 text-white px-4 py-1.5 rounded hover:bg-cyan-800 text-xs font-bold shadow"
+                      onClick={e => { e.stopPropagation(); navigate(`/customers/${c.id}`); }}
                     >
                       View
                     </button>
