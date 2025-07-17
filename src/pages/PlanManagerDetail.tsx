@@ -4,6 +4,21 @@ import { supabase } from '../service/supabaseClient';
 import * as XLSX from 'xlsx';
 import PlanManagerFinancialHistory from '../components/PlanManagerFinancialHistory.tsx';
 
+type CustomerFormType = {
+  name: string;
+  email: string;
+  phone: string;
+  renewal_date: string;
+  income: string;
+  expense: string;
+  profit: string;
+  notes: string;
+  username: string;
+  _manualIncome?: boolean;
+  _manualExpense?: boolean;
+  _manualProfit?: boolean;
+};
+
 const PlanManagerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -14,7 +29,7 @@ const PlanManagerDetail: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [customerForm, setCustomerForm] = useState({
+  const [customerForm, setCustomerForm] = useState<CustomerFormType>({
     name: '',
     email: '',
     phone: '',
@@ -24,6 +39,9 @@ const PlanManagerDetail: React.FC = () => {
     profit: '',
     notes: '',
     username: '', // new field
+    _manualIncome: false,
+    _manualExpense: false,
+    _manualProfit: false,
   });
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [customerError, setCustomerError] = useState<string | null>(null);
@@ -61,6 +79,8 @@ const PlanManagerDetail: React.FC = () => {
   });
   const [renewManagerLoading, setRenewManagerLoading] = useState(false);
   const [renewManagerError, setRenewManagerError] = useState<string | null>(null);
+  // Add state for platform expense per month
+  const [platformExpense, setPlatformExpense] = useState<number | null>(null);
 
   // Auto-calculate renewal date unless manually overridden
   useEffect(() => {
@@ -108,16 +128,18 @@ const PlanManagerDetail: React.FC = () => {
   const handleCustomerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'renewal_date') setManualRenewalOverride(true);
-    if (name === 'profit') setManualProfitOverride(true);
     setCustomerForm((prev) => {
       let updated = { ...prev, [name]: value };
-      if ((name === 'income' || name === 'expense') && !manualProfitOverride) {
+      if (name === 'income') updated._manualIncome = true;
+      if (name === 'expense') updated._manualExpense = true;
+      if (name === 'profit') updated._manualProfit = true;
+      // If income or expense changes, recalc profit unless profit was manually set
+      if ((name === 'income' || name === 'expense') && !prev._manualProfit) {
         const income = name === 'income' ? Number(value) : Number(updated.income);
         const expense = name === 'expense' ? Number(value) : Number(updated.expense);
         if (!isNaN(income) && !isNaN(expense)) {
           updated.profit = (income - expense).toString();
         }
-        setManualProfitOverride(false); // reset override if income/expense changes
       }
       return updated;
     });
@@ -542,6 +564,59 @@ const PlanManagerDetail: React.FC = () => {
     setRenewingCustomer(null);
   };
 
+  // Fetch latest expense per month for the platform when modal opens or platform changes
+  useEffect(() => {
+    async function fetchPlatformExpense() {
+      if (!showAddModal || !manager?.platform) {
+        setPlatformExpense(null);
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from('platform_price_history')
+        .select('*')
+        .eq('platform', manager.platform.toLowerCase())
+        .lte('effective_from', today)
+        .order('effective_from', { ascending: false })
+        .limit(1);
+      if (error || !data || data.length === 0) {
+        setPlatformExpense(null);
+        return;
+      }
+      setPlatformExpense(Number(data[0].price));
+    }
+    fetchPlatformExpense();
+  }, [showAddModal, manager?.platform]);
+
+  // Auto-calc logic for Add Customer modal
+  useEffect(() => {
+    if (!showAddModal || !manager) return;
+    let months = numMonths > 0 ? numMonths : 1;
+    let defaultIncome = '';
+    let defaultExpense = '';
+    let defaultProfit = '';
+    if (manager.platform && platformExpense != null) {
+      if (manager.platform.toLowerCase() === 'youtube' || manager.platform.toLowerCase() === 'yt') {
+        defaultIncome = (500 * months).toString();
+      } else if (manager.platform.toLowerCase() === 'spotify') {
+        defaultIncome = (400 * months).toString();
+      }
+      defaultExpense = (platformExpense * months).toString();
+      if (defaultIncome && defaultExpense) {
+        defaultProfit = (Number(defaultIncome) - Number(defaultExpense)).toString();
+      }
+    }
+    setCustomerForm((prev) => {
+      return {
+        ...prev,
+        income: prev._manualIncome ? prev.income : defaultIncome,
+        expense: prev._manualExpense ? prev.expense : defaultExpense,
+        profit: prev._manualProfit ? prev.profit : defaultProfit,
+      };
+    });
+    // eslint-disable-next-line
+  }, [numMonths, manager?.platform, platformExpense, showAddModal]);
+
   if (loading) return <div className="p-8 text-slate-500">Loading...</div>;
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!manager) return <div className="p-8 text-slate-500">Manager not found.</div>;
@@ -609,20 +684,22 @@ const PlanManagerDetail: React.FC = () => {
                 const mm = String(today.getMonth() + 1).padStart(2, '0');
                 const dd = String(today.getDate()).padStart(2, '0');
                 const todayStr = `${yyyy}-${mm}-${dd}`;
-                if (manager && manager.platform) {
-                  let defaults = { name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' };
+                if (manager && manager.platform && platformExpense != null) {
+                  let months = 1;
+                  if (typeof numMonths === 'number' && numMonths > 0) months = numMonths;
+                  let defaults: CustomerFormType = { name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '', _manualIncome: false, _manualExpense: false, _manualProfit: false };
                   if (manager.platform.toLowerCase() === 'youtube' || manager.platform.toLowerCase() === 'yt') {
-                    defaults.income = '500';
-                    defaults.expense = '344';
-                    defaults.profit = (500 - 344).toString();
+                    defaults.income = (500 * months).toString();
                   } else if (manager.platform.toLowerCase() === 'spotify') {
-                    defaults.income = '400';
-                    defaults.expense = '254';
-                    defaults.profit = (400 - 254).toString();
+                    defaults.income = (400 * months).toString();
+                  }
+                  defaults.expense = (platformExpense * months).toString();
+                  if (defaults.income && defaults.expense) {
+                    defaults.profit = (Number(defaults.income) - Number(defaults.expense)).toString();
                   }
                   setCustomerForm(defaults);
                 } else {
-                  setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '' });
+                  setCustomerForm({ name: '', email: '', phone: '', renewal_date: '', income: '', expense: '', profit: '', notes: '', username: '', _manualIncome: false, _manualExpense: false, _manualProfit: false });
                 }
                 setStartDate(todayStr);
                 setNumMonths(1);
