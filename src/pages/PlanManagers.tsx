@@ -57,11 +57,15 @@ const PlanManagers: React.FC = () => {
   // Fetch customer counts for each manager
   useEffect(() => {
     const fetchCounts = async () => {
-      const { data } = await supabase.from('customers').select('manager_plan_id', { count: 'exact', head: false });
+      const { data } = await supabase
+        .from('customers')
+        .select('manager_plan_id, is_active');
       const counts: { [managerId: string]: number } = {};
       if (data) {
         data.forEach((c: any) => {
-          counts[c.manager_plan_id] = (counts[c.manager_plan_id] || 0) + 1;
+          if (c.is_active !== false && c.is_active !== 0) {
+            counts[c.manager_plan_id] = (counts[c.manager_plan_id] || 0) + 1;
+          }
         });
       }
       setCustomerCounts(counts);
