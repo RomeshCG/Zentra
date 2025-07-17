@@ -246,7 +246,11 @@ const Customers: React.FC = () => {
               else if (c.status === 'Due Today') statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold text-xs">Due Today</span>;
               else statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 font-semibold text-xs">Upcoming</span>;
               return (
-                <tr key={c.id} className={`border-t transition cursor-pointer ${rowClass}`}>
+                <tr
+                  key={c.id}
+                  className={`border-t transition cursor-pointer ${rowClass}`}
+                  onClick={() => navigate(`/plan-managers/${c.manager_plan_id}?highlight=${c.id}`)}
+                >
                   <td className="px-4 py-2 font-semibold text-cyan-800 whitespace-nowrap max-w-[130px] truncate" title={c.name}>{c.name}</td>
                   <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.email}>{c.email}</td>
                   <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.phone}>{c.phone}</td>

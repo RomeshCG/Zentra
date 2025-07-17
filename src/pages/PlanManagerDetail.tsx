@@ -688,8 +688,9 @@ const PlanManagerDetail: React.FC = () => {
                   <tr
                     key={c.id}
                     className={
-                      (idx % 2 === 0 ? 'bg-white hover:bg-slate-50 cursor-pointer' : 'bg-slate-50 hover:bg-slate-100 cursor-pointer') +
-                      (highlightId === c.id ? ' ring-2 ring-cyan-500' : '') +
+                      (highlightId === c.id
+                        ? 'bg-cyan-100 cursor-pointer'
+                        : (idx % 2 === 0 ? 'bg-white hover:bg-slate-50 cursor-pointer' : 'bg-slate-50 hover:bg-slate-100 cursor-pointer')) +
                       (c.is_active === false ? ' opacity-50' : '')
                     }
                     onClick={() => openEditCustomerModal(c)}
@@ -702,7 +703,9 @@ const PlanManagerDetail: React.FC = () => {
                     <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.income).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.expense).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.profit).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-4 py-2 max-w-[300px] whitespace-pre-line break-words" title={c.notes}>{c.notes} {c.is_active === false && <span className="ml-2 inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">Inactive</span>}</td>
+                    <td className="px-4 py-2 max-w-[300px] whitespace-pre-line break-words" title={c.notes}>{c.notes} {c.is_active === false && <span className="ml-2 inline-block px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">Inactive</span>} {c.is_flagged && (
+                        <span className="ml-2 inline-block px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Flagged</span>
+                      )}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span className="text-blue-700 hover:underline mr-3">Edit</span>
                       <span className="text-red-600 hover:underline" onClick={e => { e.stopPropagation(); handleDeleteCustomer(c.id); }}>Delete</span>
