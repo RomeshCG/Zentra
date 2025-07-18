@@ -357,6 +357,7 @@ const PlanManagerDetail: React.FC = () => {
     setEditError(null);
     const updateData = {
       display_name: editForm.display_name,
+      username: editForm.username,
       email: editForm.email,
       phone: editForm.phone,
       platform: editForm.platform,
@@ -631,6 +632,9 @@ const PlanManagerDetail: React.FC = () => {
       <div className="bg-white rounded-xl shadow p-6 mb-8">
         <div className="flex items-center justify-between mb-2">
           <div className="text-2xl font-bold text-cyan-800">{manager.display_name || manager.username}</div>
+          {manager.username && (
+            <div className="text-base text-slate-600 font-mono mt-1">@{manager.username}</div>
+          )}
           <div className="flex gap-2 items-center">
             <button onClick={handleOpenEditModal} className="text-cyan-700 hover:underline text-base">Edit</button>
             <button
@@ -915,6 +919,10 @@ const PlanManagerDetail: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">Display Name</label>
                   <input name="display_name" value={editForm.display_name || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Username</label>
+                  <input name="username" value={editForm.username || ''} onChange={handleEditChange} className="w-full border rounded-lg px-3 py-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Email</label>
