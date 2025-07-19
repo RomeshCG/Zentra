@@ -16,15 +16,15 @@ const Dashboard: React.FC = () => {
     const fetchRenewals = async () => {
       setLoading(true);
       const today = new Date();
-      const weekFromNow = new Date();
-      weekFromNow.setDate(today.getDate() + 7);
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(today.getDate() + 3);
       const todayStr = today.toISOString().slice(0, 10);
-      const weekStr = weekFromNow.toISOString().slice(0, 10);
-      // Fetch all customers with renewal_date up to a week from now, and only active
+      const threeDaysStr = threeDaysFromNow.toISOString().slice(0, 10);
+      // Fetch customers with renewal_date up to 3 days from now, and only active
       const { data: customers } = await supabase
         .from('customers')
         .select('*')
-        .lte('renewal_date', weekStr)
+        .lte('renewal_date', threeDaysStr)
         .neq('is_active', false)
         .order('renewal_date', { ascending: true });
       setWeeklyCustomers(customers || []);
@@ -39,12 +39,12 @@ const Dashboard: React.FC = () => {
         .from('plan_managers')
         .select('id, platform');
       setManagers(managerData || []);
-      // Fetch plan managers with renewal_date in next 7 days
+      // Fetch plan managers with renewal_date in next 3 days
       const { data: managers } = await supabase
         .from('plan_managers')
         .select('*')
         .gte('renewal_date', todayStr)
-        .lte('renewal_date', weekStr)
+        .lte('renewal_date', threeDaysStr)
         .order('renewal_date', { ascending: true });
       setWeeklyManagers(managers || []);
       setLoading(false);
@@ -79,7 +79,7 @@ const Dashboard: React.FC = () => {
       <div className="bg-white/90 shadow-xl rounded-xl p-6 w-[96vw] max-w-[1100px] mx-auto mt-6">
         <h1 className="text-3xl font-extrabold mb-8 text-center text-cyan-800 tracking-tight drop-shadow">Zentra Dashboard</h1>
         <h2 className="text-xl font-semibold mb-4 mt-2 text-cyan-700 flex items-center gap-2">
-          <span>Customers Renewing This Week</span>
+          <span>Customers Renewing Next 3 Days</span>
           <span className="bg-cyan-100 text-cyan-700 px-3 py-1 rounded-full text-xs font-bold">{sortedCustomers.length}</span>
         </h2>
         {loading ? <div className="text-center text-cyan-700 font-semibold py-6">Loading...</div> : (
@@ -146,15 +146,14 @@ const Dashboard: React.FC = () => {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap font-mono text-sm">
                         {c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}
-                        {isOverdue && <span className="ml-2 px-2 py-1 rounded bg-red-200 text-red-800 text-xs font-bold">Overdue</span>}
-                        {isToday && <span className="ml-2 px-2 py-1 rounded bg-green-200 text-green-800 text-xs font-bold">Due Today</span>}
-                        {isTomorrow && <span className="ml-2 px-2 py-1 rounded bg-orange-200 text-orange-800 text-xs font-bold">Tomorrow</span>}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {isOverdue ? (
                           <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold text-xs">Overdue</span>
                         ) : isToday ? (
                           <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold text-xs">Due Today</span>
+                        ) : isTomorrow ? (
+                          <span className="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold text-xs">Tomorrow</span>
                         ) : (
                           <span className="inline-block px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 font-semibold text-xs">Upcoming</span>
                         )}
@@ -177,7 +176,7 @@ const Dashboard: React.FC = () => {
           </div>
         )}
         <h2 className="text-2xl font-semibold mb-6 mt-12 text-cyan-700 flex items-center gap-2">
-          <span>Plan Managers Renewing This Week</span>
+          <span>Plan Managers Renewing Next 3 Days</span>
           <span className="bg-cyan-100 text-cyan-700 px-3 py-1 rounded-full text-xs font-bold">{weeklyManagers.length}</span>
         </h2>
         {loading ? <div className="text-center text-cyan-700 font-semibold py-8">Loading...</div> : (

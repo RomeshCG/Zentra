@@ -42,23 +42,11 @@ const Customers: React.FC = () => {
   const weekFromNow = new Date();
   weekFromNow.setDate(today.getDate() + 7);
 
-  // Add status and sorting logic (copied from Dashboard)
-  type StatusType = 'Overdue' | 'Due Today' | 'Upcoming';
-  const customersWithStatus = customers
-    .filter((c) => c.is_active !== false && c.is_active !== 0)
-    .map((c) => {
-      let status: StatusType = 'Upcoming';
-      if (c.renewal_date) {
-        const renewalDate = new Date(c.renewal_date);
-        renewalDate.setHours(0, 0, 0, 0);
-        if (renewalDate < today) status = 'Overdue';
-        else if (renewalDate.getTime() === today.getTime()) status = 'Due Today';
-      }
-      return { ...c, status };
-    });
+  // Filter active customers only
+  const activeCustomers = customers.filter((c) => c.is_active !== false && c.is_active !== 0);
 
   // Filtering (search, manager, platform, renewal date/week)
-  const filtered = customersWithStatus.filter((c) => {
+  const filtered = activeCustomers.filter((c) => {
     const matchesManager = managerFilter === 'all' || c.manager_plan_id === managerFilter;
     const matchesPlatform = platformFilter === 'all' || managerMap[c.manager_plan_id]?.platform === platformFilter;
     let matchesRenewal = true;
@@ -79,13 +67,8 @@ const Customers: React.FC = () => {
     return matchesManager && matchesPlatform && matchesRenewal && (!search || matchesSearch);
   });
 
-  // Sort: Overdue first, then Due Today, then Upcoming
+  // Sort by renewal_date ascending
   const sortedFiltered = [...filtered].sort((a, b) => {
-    const statusOrder: Record<StatusType, number> = { 'Overdue': 0, 'Due Today': 1, 'Upcoming': 2 };
-    if (statusOrder[a.status as StatusType] !== statusOrder[b.status as StatusType]) {
-      return statusOrder[a.status as StatusType] - statusOrder[b.status as StatusType];
-    }
-    // If same status, sort by renewal_date ascending
     const aDate = a.renewal_date ? new Date(a.renewal_date) : new Date(0);
     const bDate = b.renewal_date ? new Date(b.renewal_date) : new Date(0);
     return aDate.getTime() - bDate.getTime();
@@ -221,7 +204,7 @@ const Customers: React.FC = () => {
               <th className="px-4 py-3 text-left font-semibold">Plan Manager</th>
               <th className="px-4 py-3 text-left font-semibold">Platform</th>
               <th className="px-4 py-3 text-left font-semibold">Renewal Date</th>
-              <th className="px-4 py-3 text-left font-semibold">Status</th>
+
               <th className="px-4 py-3 text-left font-semibold">Income</th>
               <th className="px-4 py-3 text-left font-semibold">Expense</th>
               <th className="px-4 py-3 text-left font-semibold">Profit</th>
@@ -232,19 +215,12 @@ const Customers: React.FC = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={13} className="text-center text-slate-400 py-5 text-base">Loading...</td></tr>
+              <tr><td colSpan={12} className="text-center text-slate-400 py-5 text-base">Loading...</td></tr>
             ) : sortedFiltered.length === 0 ? (
-              <tr><td colSpan={13} className="text-center text-slate-400 py-5 text-base">No customers found.</td></tr>
+              <tr><td colSpan={12} className="text-center text-slate-400 py-5 text-base">No customers found.</td></tr>
             ) : sortedFiltered.map((c) => {
-              // Row coloring and badge logic
-              let rowClass = '';
-              if (c.status === 'Overdue') rowClass = 'bg-red-50 hover:bg-red-100';
-              else if (c.status === 'Due Today') rowClass = 'bg-green-50 hover:bg-green-100';
-              else rowClass = 'hover:bg-cyan-50';
-              let statusBadge = null;
-              if (c.status === 'Overdue') statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold text-xs">Overdue</span>;
-              else if (c.status === 'Due Today') statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold text-xs">Due Today</span>;
-              else statusBadge = <span className="inline-block px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 font-semibold text-xs">Upcoming</span>;
+              // Row coloring logic
+              let rowClass = 'hover:bg-cyan-50';
               return (
                 <tr
                   key={c.id}
@@ -253,11 +229,11 @@ const Customers: React.FC = () => {
                 >
                   <td className="px-4 py-2 font-semibold text-cyan-800 whitespace-nowrap max-w-[130px] truncate" title={c.name}>{c.name}</td>
                   <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.email}>{c.email}</td>
-                  <td className="px-4 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.phone}>{c.phone}</td>
+                  <td className="px-4 py-2 whitespace-nowrap max-w-[150px] text-slate-700" title={c.phone}>{c.phone}</td>
                   <td className="px-4 py-2 whitespace-nowrap">{managerMap[c.manager_plan_id]?.display_name || managerMap[c.manager_plan_id]?.platform || '-'}</td>
                   <td className="px-4 py-2 whitespace-nowrap">{managerMap[c.manager_plan_id]?.platform || '-'}</td>
                   <td className="px-4 py-2 whitespace-nowrap font-mono text-sm">{c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">{statusBadge}</td>
+
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.income).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.expense).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="px-4 py-2 whitespace-nowrap">Rs.{Number(c.profit).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
