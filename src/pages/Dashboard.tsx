@@ -10,6 +10,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [managers, setManagers] = useState<any[]>([]);
   const [allCustomers, setAllCustomers] = useState<any[]>([]); // NEW
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRenewals = async () => {
@@ -106,8 +107,12 @@ const Dashboard: React.FC = () => {
                   else if (manager.platform === 'spotify' || manager.platform === 'Spotify') renewalFee = 'Rs.400';
                   const renewalDate = new Date(c.renewal_date);
                   renewalDate.setHours(0, 0, 0, 0);
+                  const tomorrow = new Date();
+                  tomorrow.setDate(today.getDate() + 1);
+                  tomorrow.setHours(0, 0, 0, 0);
                   const isOverdue = renewalDate < today;
                   const isToday = renewalDate.getTime() === today.getTime();
+                  const isTomorrow = renewalDate.getTime() === tomorrow.getTime();
                   // Platform color logic
                   let platformColor = '';
                   if (manager.platform === 'spotify' || manager.platform === 'Spotify') platformColor = 'text-green-600 font-bold';
@@ -124,11 +129,30 @@ const Dashboard: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-3 py-2 font-semibold text-cyan-800 whitespace-nowrap max-w-[130px] truncate" title={c.name}>{c.name}</td>
-                      <td className="px-3 py-2 whitespace-nowrap max-w-[120px] truncate text-slate-700" title={c.phone}>{c.phone}</td>
+                      <td className="px-3 py-2 whitespace-nowrap max-w-[140px] text-slate-700 flex items-center gap-2" title={c.phone}>
+                        <span className="truncate">{c.phone}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(c.phone);
+                            setCopiedPhone(c.phone);
+                            setTimeout(() => setCopiedPhone(null), 2000);
+                          }}
+                          className="text-cyan-600 hover:text-cyan-800 transition-all duration-300 flex-shrink-0 transform hover:scale-110"
+                          title="Copy phone number"
+                        >
+                          {copiedPhone === c.phone ? (
+                            <span className="text-green-600 animate-pulse">✓</span>
+                          ) : (
+                            <span>📋</span>
+                          )}
+                        </button>
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap font-mono text-sm">
                         {c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}
                         {isOverdue && <span className="ml-2 px-2 py-1 rounded bg-red-200 text-red-800 text-xs font-bold">Overdue</span>}
                         {isToday && <span className="ml-2 px-2 py-1 rounded bg-green-200 text-green-800 text-xs font-bold">Due Today</span>}
+                        {isTomorrow && <span className="ml-2 px-2 py-1 rounded bg-orange-200 text-orange-800 text-xs font-bold">Tomorrow</span>}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {isOverdue ? (
