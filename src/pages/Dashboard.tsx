@@ -129,24 +129,20 @@ const Dashboard: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-3 py-2 font-semibold text-cyan-800 whitespace-nowrap max-w-[130px] truncate" title={c.name}>{c.name}</td>
-                      <td className="px-3 py-2 whitespace-nowrap max-w-[140px] text-slate-700 flex items-center gap-2" title={c.phone}>
-                        <span className="truncate">{c.phone}</span>
-                        <button
+                      <td className="px-3 py-2 whitespace-nowrap max-w-[140px] text-slate-700" title={c.phone}>
+                        <span 
+                          className={`cursor-pointer hover:text-cyan-700 transition-colors ${copiedPhone === c.phone ? 'text-green-600 font-semibold' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             navigator.clipboard.writeText(c.phone);
                             setCopiedPhone(c.phone);
                             setTimeout(() => setCopiedPhone(null), 2000);
                           }}
-                          className="text-cyan-600 hover:text-cyan-800 transition-all duration-300 flex-shrink-0 transform hover:scale-110"
-                          title="Copy phone number"
+                          title="Click to copy phone number"
                         >
-                          {copiedPhone === c.phone ? (
-                            <span className="text-green-600 animate-pulse">✓</span>
-                          ) : (
-                            <span>📋</span>
-                          )}
-                        </button>
+                          {c.phone}
+                          {copiedPhone === c.phone && <span className="ml-1 animate-pulse">✓</span>}
+                        </span>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap font-mono text-sm">
                         {c.renewal_date ? new Date(c.renewal_date).toLocaleDateString() : '-'}
